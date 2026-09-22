@@ -79,17 +79,6 @@ supabase/migrations/20260921000000_initial_schema.sql
 
 ## Local Development & Setup Instructions
 
-### 1. Environment Configuration
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-Fill in your Supabase credentials:
-```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-```
-
 ### 2. Install Dependencies
 ```bash
 npm install
@@ -113,10 +102,6 @@ npm run preview
 
 ---
 
-## Admin Login Credentials
 
-To access the Admin Portal (`/admin`):
-- **Email**: `admin@kaalvastr.in`
-- **Password**: `kaalvastr123`
 
 *(Supports both Supabase Auth authentication and offline fallback demo login).*
