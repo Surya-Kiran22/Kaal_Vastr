@@ -47,3 +47,38 @@ export interface WhatsAppOrderPayload {
   items: CartItem[];
   totalAmount: number;
 }
+
+export interface OrderItem {
+  product_id: string;
+  product_name: string;
+  size: string;
+  color?: string;
+  quantity: number;
+  price: number;
+}
+
+export interface Order {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  address_notes?: string;
+  items: OrderItem[];
+  total_amount: number;
+  status: 'pending' | 'confirmed' | 'fulfilled' | 'cancelled';
+  created_at: string;
+}
+
+export interface SalesAnalytics {
+  todaySales: number;
+  todayOrderCount: number;
+  weekSales: number;
+  weekOrderCount: number;
+  monthSales: number;
+  monthOrderCount: number;
+  totalCustomers: number;
+  todaysShoppingCount: number;
+  averageOrderValue: number;
+  topProducts: { name: string; salesCount: number; revenue: number }[];
+  categoryBreakdown: { category: string; salesCount: number; revenue: number }[];
+}
+

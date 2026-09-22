@@ -77,11 +77,11 @@ export const Header: React.FC = () => {
               </Link>
             ))}
             <Link
-              to="/admin"
+              to="/admin/login"
               className="text-xs uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors flex items-center space-x-1"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Admin</span>
+              <span>Sign In</span>
             </Link>
           </nav>
 
@@ -130,15 +130,16 @@ export const Header: React.FC = () => {
             </Link>
           ))}
           <Link
-            to="/admin"
+            to="/admin/login"
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center space-x-2 text-sm uppercase tracking-wider text-zinc-400 py-2 pt-3"
           >
             <ShieldCheck className="w-4 h-4 text-zinc-400" />
-            <span>Admin Portal</span>
+            <span>Sign In</span>
           </Link>
         </div>
       )}
+
     </header>
   );
 };

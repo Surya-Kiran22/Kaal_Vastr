@@ -4,6 +4,8 @@ services:
     env: static
     buildCommand: npm run build
     staticPublishPath: ./dist
+    numInstances: 2 # Scale instances for load balancing 200+ concurrent members
+    healthCheckPath: /
     routes:
       - type: rewrite
         source: /*
@@ -12,4 +14,14 @@ services:
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_BREVO_SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: VITE_BREVO_SMTP_PORT
+        value: "2525"
+      - key: VITE_BREVO_SMTP_USER
+        sync: false
+      - key: VITE_BREVO_SMTP_PASSWORD
         sync: false

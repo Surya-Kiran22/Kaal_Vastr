@@ -1,6 +1,15 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { sendBrevoWelcomeEmail } from '../lib/brevoSmtp';
+import { globalLoadBalancer } from '../lib/loadBalancerThrottler';
+
+interface RegisterParams {
+  email: string;
+  pass: string;
+  name: string;
+  role: 'admin' | 'staff' | 'customer';
+}
 
 interface AuthContextType {
   user: User | null;
@@ -8,10 +17,12 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   loginWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  registerUser: (params: RegisterParams) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
 }
 
 const LOCAL_ADMIN_KEY = 'kaalvastr_admin_session';
+const LOCAL_USER_STORE = 'kaalvastr_users_store';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -50,38 +61,106 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  /**
+   * High-concurrency safe login handler (throttled via global load balancer)
+   */
   const loginWithEmail = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password: pass,
-        });
+    return globalLoadBalancer.schedule(async () => {
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password: pass,
+          });
 
-        if (error) {
-          return { success: false, error: error.message };
-        }
+          if (error) {
+            return { success: false, error: error.message };
+          }
 
-        if (data.session) {
-          setSession(data.session);
-          setUser(data.user);
-          setIsAdmin(true);
-          localStorage.setItem(LOCAL_ADMIN_KEY, 'true');
-          return { success: true };
+          if (data.session) {
+            setSession(data.session);
+            setUser(data.user);
+            setIsAdmin(true);
+            localStorage.setItem(LOCAL_ADMIN_KEY, 'true');
+            return { success: true };
+          }
+        } catch (err: any) {
+          return { success: false, error: err.message || 'Login failed' };
         }
-      } catch (err: any) {
-        return { success: false, error: err.message || 'Login failed' };
       }
-    }
 
-    // Default admin credentials for standalone demo / offline testing
-    if ((email === 'admin@kaalvastr.in' || email === 'admin') && (pass === 'kaalvastr123' || pass === 'admin123')) {
-      setIsAdmin(true);
-      localStorage.setItem(LOCAL_ADMIN_KEY, 'true');
+      // Local fallback checking
+      const storedUsersRaw = localStorage.getItem(LOCAL_USER_STORE);
+      let registeredUsers: any[] = [];
+      if (storedUsersRaw) {
+        try { registeredUsers = JSON.parse(storedUsersRaw); } catch {}
+      }
+
+      const foundUser = registeredUsers.find(u => u.email === email && u.pass === pass);
+
+      if (foundUser || (email === 'admin@kaalvastr.in' || email === 'admin') && (pass === 'kaalvastr123' || pass === 'admin123')) {
+        setIsAdmin(true);
+        localStorage.setItem(LOCAL_ADMIN_KEY, 'true');
+        return { success: true };
+      }
+
+      return { success: false, error: 'Invalid email or password' };
+    });
+  };
+
+  /**
+   * User & Admin Registration Handler with Brevo SMTP email dispatch
+   */
+  const registerUser = async ({ email, pass, name, role }: RegisterParams): Promise<{ success: boolean; error?: string }> => {
+    return globalLoadBalancer.schedule(async () => {
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password: pass,
+            options: {
+              data: {
+                full_name: name,
+                role: role,
+              },
+            },
+          });
+
+          if (error) {
+            return { success: false, error: error.message };
+          }
+
+          // Trigger Brevo SMTP transactional confirmation email
+          await sendBrevoWelcomeEmail({ email, name, role });
+
+          if (data.user) {
+            setUser(data.user);
+            setIsAdmin(role === 'admin');
+            localStorage.setItem(LOCAL_ADMIN_KEY, role === 'admin' ? 'true' : 'false');
+            return { success: true };
+          }
+        } catch (err: any) {
+          return { success: false, error: err.message || 'Registration failed' };
+        }
+      }
+
+      // Local Fallback store & Brevo email dispatch
+      const storedUsersRaw = localStorage.getItem(LOCAL_USER_STORE);
+      let registeredUsers: any[] = [];
+      if (storedUsersRaw) {
+        try { registeredUsers = JSON.parse(storedUsersRaw); } catch {}
+      }
+
+      registeredUsers.push({ email, pass, name, role, created_at: new Date().toISOString() });
+      localStorage.setItem(LOCAL_USER_STORE, JSON.stringify(registeredUsers));
+
+      // Dispatch Brevo welcome email
+      await sendBrevoWelcomeEmail({ email, name, role });
+
+      setIsAdmin(role === 'admin');
+      localStorage.setItem(LOCAL_ADMIN_KEY, role === 'admin' ? 'true' : 'false');
       return { success: true };
-    }
-
-    return { success: false, error: 'Invalid admin email or password' };
+    });
   };
 
   const logout = async () => {
@@ -95,7 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, loginWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, loading, loginWithEmail, registerUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

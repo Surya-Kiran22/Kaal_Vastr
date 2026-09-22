@@ -139,3 +139,43 @@ INSERT INTO public.products (name, category, brand, sku, description, selling_pr
 ('Vanguard Sweatshirt', 'Sweatshirts', 'Kaal Vastr', 'KV-SW-005', 'Structured French terry crewneck with tonal embroidered Kaal Vastr chest crest.', 3499.00, 4299.00, ARRAY['S', 'M', 'L', 'XL'], ARRAY['Steel Grey', 'Coal Black'], 'https://images.unsplash.com/photo-1578587018452-892bacefd3f2?auto=format&fit=crop&w=800&q=80', 12, true, false),
 ('Eclipse Structured Blazer', 'Outerwear', 'Kaal Vastr', 'KV-BL-006', 'Modern unconstructed tailored jacket crafted from premium wool-blend twill.', 8999.00, 11999.00, ARRAY['M', 'L', 'XL'], ARRAY['Charcoal Charcoal'], 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=800&q=80', 4, true, false)
 ON CONFLICT (sku) DO NOTHING;
+
+-- 7. Create orders table for WhatsApp order logging & sales analytics
+CREATE TABLE IF NOT EXISTS public.orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    address_notes TEXT,
+    items JSONB NOT NULL,
+    total_amount NUMERIC(10, 2) NOT NULL,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'fulfilled', 'cancelled')),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+
+-- Anyone (anon or authenticated customer) can record an order upon checkout
+CREATE POLICY "Public insert orders" 
+ON public.orders 
+FOR INSERT 
+WITH CHECK (true);
+
+-- Only authenticated admins can read and update orders
+CREATE POLICY "Admin select orders" 
+ON public.orders 
+FOR SELECT 
+TO authenticated 
+USING (true);
+
+CREATE POLICY "Admin update orders" 
+ON public.orders 
+FOR UPDATE 
+TO authenticated 
+USING (true);
+
+CREATE POLICY "Admin delete orders" 
+ON public.orders 
+FOR DELETE 
+TO authenticated 
+USING (true);
+

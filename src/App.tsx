@@ -12,6 +12,7 @@ import { HomePage } from './pages/HomePage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { AboutPage } from './pages/AboutPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminRegisterPage } from './pages/AdminRegisterPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 
 export default function App() {
@@ -32,6 +33,8 @@ export default function App() {
                   <Route path="/product/:id" element={<ProductDetailPage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/admin/login" element={<AdminLoginPage />} />
+                  <Route path="/admin/register" element={<AdminRegisterPage />} />
+                  <Route path="/register" element={<AdminRegisterPage />} />
                   <Route
                     path="/admin/*"
                     element={

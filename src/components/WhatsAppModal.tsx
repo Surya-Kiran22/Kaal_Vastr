@@ -1,28 +1,58 @@
 import React, { useState } from 'react';
-import { X, MessageSquare, CheckCircle2, ShoppingBag, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, MessageSquare, CheckCircle2, ShoppingBag, ArrowLeft, Lock, UserPlus, LogIn } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useBusiness } from '../context/BusinessContext';
+import { useAuth } from '../context/AuthContext';
+import { saveOrder } from '../lib/supabase';
 
 interface WhatsAppModalProps {
   onClose: () => void;
 }
 
 export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({ onClose }) => {
+  const navigate = useNavigate();
   const { cart, subtotal, clearCart, setIsCartOpen } = useCart();
   const { settings } = useBusiness();
+  const { user, isAdmin } = useAuth();
 
-  const [customerName, setCustomerName] = useState('');
+  const [customerName, setCustomerName] = useState(user?.user_metadata?.full_name || '');
   const [customerPhone, setCustomerPhone] = useState('');
   const [addressNotes, setAddressNotes] = useState('');
   const [error, setError] = useState('');
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const [confirmedDetails, setConfirmedDetails] = useState<{ name: string; total: number; itemCount: number } | null>(null);
 
-  const handleSendOrder = (e: React.FormEvent) => {
+  const isLoggedIn = Boolean(user || isAdmin);
+
+  const handleSendOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName.trim() || !customerPhone.trim()) {
       setError('Please provide your name and contact mobile number.');
       return;
+    }
+
+
+    // Save order into Supabase / local storage engine
+    const orderItems = cart.map((item) => ({
+      product_id: item.product.id,
+      product_name: item.product.name,
+      size: item.selectedSize,
+      color: item.selectedColor,
+      quantity: item.quantity,
+      price: item.product.selling_price,
+    }));
+
+    try {
+      await saveOrder({
+        customer_name: customerName.trim(),
+        customer_phone: customerPhone.trim(),
+        address_notes: addressNotes.trim(),
+        items: orderItems,
+        total_amount: subtotal,
+      });
+    } catch (err) {
+      console.warn('Could not record order to backend database:', err);
     }
 
     const targetNumber = settings?.whatsapp_number || '919876543210';
@@ -57,6 +87,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({ onClose }) => {
     setOrderConfirmed(true);
   };
 
+
   const handleReturnToSite = () => {
     onClose();
     setIsCartOpen(false);
@@ -66,7 +97,61 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({ onClose }) => {
     <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
       <div className="w-full max-w-md bg-[#141416] border border-[#27272A] rounded-lg p-6 shadow-2xl space-y-5 text-white">
         
-        {orderConfirmed ? (
+        {!isLoggedIn ? (
+          /* Mandatory Login / Register Prompt for Shopping */
+          <div className="text-center py-4 space-y-5">
+            <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg">
+              <Lock className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-base font-bold tracking-wider uppercase text-white">
+                Account Login Required
+              </h3>
+              <p className="text-xs text-zinc-300 max-w-xs mx-auto leading-relaxed">
+                To complete your order and receive dispatch updates on WhatsApp, please sign in or create a customer account first.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-zinc-900/80 rounded-md border border-zinc-800 text-xs space-y-1.5 text-left">
+              <div className="flex justify-between text-zinc-400">
+                <span>Selected Items:</span>
+                <span className="text-zinc-200 font-medium">{cart.reduce((s, i) => s + i.quantity, 0)} items</span>
+              </div>
+              <div className="flex justify-between text-zinc-400">
+                <span>Total Amount:</span>
+                <span className="text-white font-bold">₹{subtotal.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <div className="pt-2 space-y-3">
+              <button
+                onClick={() => {
+                  onClose();
+                  setIsCartOpen(false);
+                  navigate('/admin/login');
+                }}
+                className="w-full py-3.5 bg-white text-black font-semibold text-xs tracking-widest uppercase rounded-md hover:bg-zinc-200 transition-all flex items-center justify-center space-x-2 shadow-lg"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In to Account</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  onClose();
+                  setIsCartOpen(false);
+                  navigate('/register');
+                }}
+                className="w-full py-3.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-200 hover:text-white font-semibold text-xs tracking-widest uppercase rounded-md transition-all flex items-center justify-center space-x-2"
+              >
+                <UserPlus className="w-4 h-4 text-emerald-400" />
+                <span>Register New Customer Account</span>
+              </button>
+            </div>
+          </div>
+        ) : orderConfirmed ? (
+
           /* Order Confirmation / Return to Website View */
           <div className="text-center py-4 space-y-5">
             <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-lg">
